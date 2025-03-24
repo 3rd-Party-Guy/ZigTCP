@@ -53,20 +53,27 @@ pub fn main() !void {
 fn writeMessage(socket: posix.socket_t, msg: []const u8) !void {
     var buf: [4]u8 = undefined;
     std.mem.writeInt(u32, &buf, @intCast(msg.len), .little);
-    try writeAll(socket, &buf);
-    try writeAll(socket, msg);
+
+    var vec = [2]posix.iovec_const{
+        .{ .len = 4, .base = &buf },
+        .{ .len = msg.len, .base = msg.ptr },
+    };
+
+    try writeAllV(socket, &vec);
 }
 
-fn writeAll(socket: posix.socket_t, msg: []const u8) !void {
-    var pos: usize = 0;
-
-    while (pos < msg.len) {
-        const numBytesWritten = try posix.write(socket, msg[pos..]);
-        if (numBytesWritten == 0) {
-            return error.Closed;
+fn writeAllV(socket: posix.socket_t, vec: posix.iovec_const) !void {
+    var i: usize = 0;
+    while (true) {
+        var numBytesWritten = try posix.writev(socket, vec[i..]);
+        while (numBytesWritten >= vec[i].len) {
+            numBytesWritten -= vec[i].len;
+            i += 1;
+            if (i >= vec.len) return;
         }
 
-        pos += numBytesWritten;
+        vec[i].base += numBytesWritten;
+        vec[i].len -= numBytesWritten;
     }
 }
 
