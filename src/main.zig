@@ -29,6 +29,7 @@ pub fn main() !void {
 
         const timeout = posix.timeval{ .sec = 2, .usec = 500_000 };
         try posix.setsockopt(socket, posix.SOL.SOCKET, posix.SO.RCVTIMEO, &std.mem.toBytes(timeout));
+        try posix.setsockopt(socket, posix.SOL.SOCKET, posix.SO.SNDTIMEO, &std.mem.toBytes(timeout));
 
         const numBytesRead: usize = posix.read(socket, &buf) catch |err| {
             std.debug.print("Error reading\n{}\n", .{err});
