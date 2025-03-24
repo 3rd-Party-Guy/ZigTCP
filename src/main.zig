@@ -15,6 +15,7 @@ pub fn main() !void {
 
     const isRunning: bool = true;
     var buf: [128]u8 = undefined;
+
     while (isRunning) {
         var clientAddress: net.Address = undefined;
         var addressLen: posix.socklen_t = @sizeOf(net.Address);
@@ -37,20 +38,26 @@ pub fn main() !void {
         };
 
         if (numBytesRead == 0) {
-            write(socket, "Error: no input provided") catch |err| {
+            writeMessage(socket, "Error: no input provided") catch |err| {
                 std.debug.print("Error writing error\n{}\n", .{err});
             };
-
             continue;
         }
 
-        write(socket, buf[0..numBytesRead]) catch |err| {
+        writeMessage(socket, buf[0..numBytesRead]) catch |err| {
             std.debug.print("Error echoing back\n{}\n", .{err});
         };
     }
 }
 
-fn write(socket: posix.socket_t, msg: []const u8) !void {
+fn writeMessage(socket: posix.socket_t, msg: []const u8) !void {
+    var buf: [4]u8 = undefined;
+    std.mem.writeInt(u32, &buf, @intCast(msg.len), .little);
+    try writeAll(socket, &buf);
+    try writeAll(socket, msg);
+}
+
+fn writeAll(socket: posix.socket_t, msg: []const u8) !void {
     var pos: usize = 0;
 
     while (pos < msg.len) {
@@ -60,5 +67,31 @@ fn write(socket: posix.socket_t, msg: []const u8) !void {
         }
 
         pos += numBytesWritten;
+    }
+}
+
+fn readMessage(socket: posix.socket_t, buf: []u8) ![]u8 {
+    var header: [4]u8 = undefined;
+    try readAll(socket, &header);
+
+    const len = std.mem.readInt(u32, &header, .little);
+    if (len > buf.len) {
+        return error.BufferTooSmall;
+    }
+
+    const msg = buf[0..len];
+    try readAll(socket, msg);
+    return msg;
+}
+
+fn readAll(socket: posix.socket_t, buf: []u8) !void {
+    var into = buf;
+    while (into.len > 0) {
+        const numBytesRead = try posix.read(socket, into);
+        if (numBytesRead == 0) {
+            return error.Closed;
+        }
+
+        into = into[numBytesRead..];
     }
 }
