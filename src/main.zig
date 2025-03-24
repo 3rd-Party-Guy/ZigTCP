@@ -14,6 +14,7 @@ pub fn main() !void {
     try posix.listen(listener, 128);
 
     const isRunning: bool = true;
+    var buf: [128]u8 = undefined;
     while (isRunning) {
         var clientAddress: net.Address = undefined;
         var addressLen: posix.socklen_t = @sizeOf(net.Address);
@@ -26,8 +27,24 @@ pub fn main() !void {
 
         std.debug.print("{} connected\n", .{clientAddress});
 
-        write(socket, "Hello!\n") catch |err| {
-            std.debug.print("Error writing\n{}\n", .{err});
+        const timeout = posix.timeval{ .sec = 2, .usec = 500_000 };
+        try posix.setsockopt(socket, posix.SOL.SOCKET, posix.SO.RCVTIMEO, &std.mem.toBytes(timeout));
+
+        const numBytesRead: usize = posix.read(socket, &buf) catch |err| {
+            std.debug.print("Error reading\n{}\n", .{err});
+            continue;
+        };
+
+        if (numBytesRead == 0) {
+            write(socket, "Error: no input provided") catch |err| {
+                std.debug.print("Error writing error\n{}\n", .{err});
+            };
+
+            continue;
+        }
+
+        write(socket, buf[0..numBytesRead]) catch |err| {
+            std.debug.print("Error echoing back\n{}\n", .{err});
         };
     }
 }
@@ -36,11 +53,11 @@ fn write(socket: posix.socket_t, msg: []const u8) !void {
     var pos: usize = 0;
 
     while (pos < msg.len) {
-        const written = try posix.write(socket, msg[pos..]);
-        if (written == 0) {
+        const numBytesWritten = try posix.write(socket, msg[pos..]);
+        if (numBytesWritten == 0) {
             return error.Closed;
         }
 
-        pos += written;
+        pos += numBytesWritten;
     }
 }
