@@ -2,7 +2,7 @@ const std = @import("std");
 const net = std.net;
 const posix = std.posix;
 
-const Reader = @import("Reader.zig");
+const Client = @import("Client.zig");
 
 pub fn main() !void {
     const address: net.Address = try std.net.Address.resolveIp("127.0.0.1", 6969);
@@ -33,24 +33,9 @@ pub fn main() !void {
         try posix.setsockopt(socket, posix.SOL.SOCKET, posix.SO.RCVTIMEO, &std.mem.toBytes(timeout));
         try posix.setsockopt(socket, posix.SOL.SOCKET, posix.SO.SNDTIMEO, &std.mem.toBytes(timeout));
 
-        const thread = try std.Thread.spawn(.{}, handleConnection, .{socket, clientAddress});
+        const client = Client{ .socket = socket, .address = clientAddress };
+        const thread = try std.Thread.spawn(.{}, client.handleConnection, .{client});
         thread.detach();
-    }
-}
-
-fn handleConnection(socket: posix.socket_t, address: net.Address)  void {
-    defer posix.close(socket);
-
-    const timeout = posix.timeval{ .sec = 2, .usec = 500_000 };
-    try posix.setsockopt(socket, posix.SOL.SOCKET, posix.SO.RCVTIMEO, &std.mem.toBytes(timeout));
-    try posix.setsockopt(socket, posix.SO.SOCKET, posix.SO.SNDTIMEO, &std.mem.toBytes(timeout));
-
-    var buf: [1024]u8 = undefined;
-    var reader = Reader{ .pos = 0, .buf = &buf, .socket = socket };
-
-    while (true) {
-        const msg = try reader.readMessage();
-        std.debug.print("Got: {s}", .{ msg });
     }
 }
 
@@ -80,4 +65,3 @@ fn writeAllV(socket: posix.socket_t, vec: posix.iovec_const) !void {
         vec[i].len -= numBytesWritten;
     }
 }
-
