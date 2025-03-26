@@ -8,7 +8,14 @@ const Client = struct {
     socket: posix.socket_t,
     address: net.Address,
 
-    fn handleConnection(self: Client) !void {
+    fn handleConnection(self: Client) void {
+        self.handleConnectionInternal() catch |err| switch (err) {
+            error.Closed => {},
+            else => std.debug.print("[{any}] client handle error\n{}\n", .{ self.address, err }),
+        };
+    }
+
+    fn handleConnectionInternal(self: Client) !void {
         const socket = self.socket;
         defer posix.close();
         std.debug.print("{} connected\n", .{self.address});

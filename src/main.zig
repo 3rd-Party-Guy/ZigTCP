@@ -5,15 +5,19 @@ const posix = std.posix;
 const Client = @import("Client.zig");
 
 pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+
+    var pool: std.Thread.Pool = undefined;
+    try std.Thread.Pool.init(&pool, .{ .allocator = allocator, .n_jobs = 64 });
+
     const address: net.Address = try std.net.Address.resolveIp("127.0.0.1", 6969);
     const tpe: u32 = posix.SOCK.STREAM;
     const protocol = posix.IPPROTO.TCP;
     const listener = try posix.socket(address.any.family, tpe, protocol);
     defer posix.close(listener);
 
-    try posix.setsockopt(listener, posix.SOL.SOCKET, posix.SO.REUSEADDR, &std.mem.toBytes(@as(c_int, 1)));
-    try posix.bind(listener, &address.any, address.getOsSockLen());
-    try posix.listen(listener, 128);
+    setupSocketConfiguration(listener, address);
 
     const isRunning: bool = true;
 
@@ -28,9 +32,14 @@ pub fn main() !void {
         defer posix.close(socket);
 
         const client = Client{ .socket = socket, .address = clientAddress };
-        const thread = try std.Thread.spawn(.{}, client.handleConnection, .{client});
-        thread.detach();
+        try pool.spawn(.{}, client.handleConnection, .{client});
     }
+}
+
+fn setupSocketConfiguration(listener: posix.socket_t, address: net.Address) void {
+    try posix.setsockopt(listener, posix.SOL.SOCKET, posix.SO.REUSEADDR, &std.mem.toBytes(@as(c_int, 1)));
+    try posix.bind(listener, &address.any, address.getOsSockLen());
+    try posix.listen(listener, 128);
 }
 
 fn writeMessage(socket: posix.socket_t, msg: []const u8) !void {
