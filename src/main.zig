@@ -2,6 +2,8 @@ const std = @import("std");
 const net = std.net;
 const posix = std.posix;
 
+const Reader = @import("Reader.zig");
+
 pub fn main() !void {
     const address: net.Address = try std.net.Address.resolveIp("127.0.0.1", 6969);
     const tpe: u32 = posix.SOCK.STREAM;
@@ -14,7 +16,6 @@ pub fn main() !void {
     try posix.listen(listener, 128);
 
     const isRunning: bool = true;
-    var buf: [128]u8 = undefined;
 
     while (isRunning) {
         var clientAddress: net.Address = undefined;
@@ -32,21 +33,24 @@ pub fn main() !void {
         try posix.setsockopt(socket, posix.SOL.SOCKET, posix.SO.RCVTIMEO, &std.mem.toBytes(timeout));
         try posix.setsockopt(socket, posix.SOL.SOCKET, posix.SO.SNDTIMEO, &std.mem.toBytes(timeout));
 
-        const numBytesRead: usize = posix.read(socket, &buf) catch |err| {
-            std.debug.print("Error reading\n{}\n", .{err});
-            continue;
-        };
+        const thread = try std.Thread.spawn(.{}, handleConnection, .{socket, clientAddress});
+        thread.detach();
+    }
+}
 
-        if (numBytesRead == 0) {
-            writeMessage(socket, "Error: no input provided") catch |err| {
-                std.debug.print("Error writing error\n{}\n", .{err});
-            };
-            continue;
-        }
+fn handleConnection(socket: posix.socket_t, address: net.Address)  void {
+    defer posix.close(socket);
 
-        writeMessage(socket, buf[0..numBytesRead]) catch |err| {
-            std.debug.print("Error echoing back\n{}\n", .{err});
-        };
+    const timeout = posix.timeval{ .sec = 2, .usec = 500_000 };
+    try posix.setsockopt(socket, posix.SOL.SOCKET, posix.SO.RCVTIMEO, &std.mem.toBytes(timeout));
+    try posix.setsockopt(socket, posix.SO.SOCKET, posix.SO.SNDTIMEO, &std.mem.toBytes(timeout));
+
+    var buf: [1024]u8 = undefined;
+    var reader = Reader{ .pos = 0, .buf = &buf, .socket = socket };
+
+    while (true) {
+        const msg = try reader.readMessage();
+        std.debug.print("Got: {s}", .{ msg });
     }
 }
 
@@ -77,28 +81,3 @@ fn writeAllV(socket: posix.socket_t, vec: posix.iovec_const) !void {
     }
 }
 
-fn readMessage(socket: posix.socket_t, buf: []u8) ![]u8 {
-    var header: [4]u8 = undefined;
-    try readAll(socket, &header);
-
-    const len = std.mem.readInt(u32, &header, .little);
-    if (len > buf.len) {
-        return error.BufferTooSmall;
-    }
-
-    const msg = buf[0..len];
-    try readAll(socket, msg);
-    return msg;
-}
-
-fn readAll(socket: posix.socket_t, buf: []u8) !void {
-    var into = buf;
-    while (into.len > 0) {
-        const numBytesRead = try posix.read(socket, into);
-        if (numBytesRead == 0) {
-            return error.Closed;
-        }
-
-        into = into[numBytesRead..];
-    }
-}
