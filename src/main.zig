@@ -27,12 +27,6 @@ pub fn main() !void {
         };
         defer posix.close(socket);
 
-        std.debug.print("{} connected\n", .{clientAddress});
-
-        const timeout = posix.timeval{ .sec = 2, .usec = 500_000 };
-        try posix.setsockopt(socket, posix.SOL.SOCKET, posix.SO.RCVTIMEO, &std.mem.toBytes(timeout));
-        try posix.setsockopt(socket, posix.SOL.SOCKET, posix.SO.SNDTIMEO, &std.mem.toBytes(timeout));
-
         const client = Client{ .socket = socket, .address = clientAddress };
         const thread = try std.Thread.spawn(.{}, client.handleConnection, .{client});
         thread.detach();
