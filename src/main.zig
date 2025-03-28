@@ -17,7 +17,7 @@ pub fn main() !void {
     const listener = try posix.socket(address.any.family, tpe, protocol);
     defer posix.close(listener);
 
-    setupSocketConfiguration(listener, address);
+    try setupSocketConfiguration(listener, address);
 
     const isRunning: bool = true;
 
@@ -36,7 +36,7 @@ pub fn main() !void {
     }
 }
 
-fn setupSocketConfiguration(listener: posix.socket_t, address: net.Address) void {
+fn setupSocketConfiguration(listener: posix.socket_t, address: net.Address) !void {
     try posix.setsockopt(listener, posix.SOL.SOCKET, posix.SO.REUSEADDR, &std.mem.toBytes(@as(c_int, 1)));
     try posix.bind(listener, &address.any, address.getOsSockLen());
     try posix.listen(listener, 128);
