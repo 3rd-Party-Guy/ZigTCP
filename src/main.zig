@@ -2,7 +2,7 @@ const std = @import("std");
 const net = std.net;
 const posix = std.posix;
 
-const Client = @import("Client.zig");
+const ClientHandler = @import("ClientHandler.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -31,8 +31,8 @@ pub fn main() !void {
         };
         defer posix.close(socket);
 
-        const client = Client{ .socket = socket, .address = clientAddress };
-        try pool.spawn(.{}, client.handleConnection, .{client});
+        const clientHandler = ClientHandler{ .socket = socket, .address = clientAddress };
+        try pool.spawn(.{}, clientHandler.handleConnection, .{clientHandler});
     }
 }
 

@@ -4,18 +4,18 @@ const net = std.net;
 
 const Reader = @import("Reader.zig");
 
-const Client = struct {
+const ClientHandler = struct {
     socket: posix.socket_t,
     address: net.Address,
 
-    fn handleConnection(self: Client) void {
+    fn handleConnection(self: ClientHandler) void {
         self.handleConnectionInternal() catch |err| switch (err) {
             error.Closed => {},
             else => std.debug.print("[{any}] client handle error\n{}\n", .{ self.address, err }),
         };
     }
 
-    fn handleConnectionInternal(self: Client) !void {
+    fn handleConnectionInternal(self: ClientHandler) !void {
         const socket = self.socket;
         defer posix.close();
         std.debug.print("{} connected\n", .{self.address});
