@@ -16,16 +16,15 @@ const ClientHandler = struct {
     }
 
     fn handleConnectionInternal(self: ClientHandler) !void {
-        const socket = self.socket;
-        defer posix.close();
+        defer posix.close(self.socket);
         std.debug.print("{} connected\n", .{self.address});
 
         const timeout = posix.timeval{ .sec = 2, .usec = 500_000 };
-        try posix.setsockopt(socket, posix.SOL.SOCKET, posix.SO.RCVTIMEO, &std.mem.toBytes(timeout));
-        try posix.setsockopt(socket, posix.SOL.SOCKET, posix.SO.SNDTIMEO, &std.mem.toBytes(timeout));
+        try posix.setsockopt(self.socket, posix.SOL.SOCKET, posix.SO.RCVTIMEO, &std.mem.toBytes(timeout));
+        try posix.setsockopt(self.socket, posix.SOL.SOCKET, posix.SO.SNDTIMEO, &std.mem.toBytes(timeout));
 
         var buf: [1024]u8 = undefined;
-        var reader = Reader{ .pps = 0, .buf = &buf, .socket = socket };
+        var reader = Reader{ .pos = 0, .buf = buf[0..], .socket = self.socket };
 
         while (true) {
             const msg = try reader.readMessage();
