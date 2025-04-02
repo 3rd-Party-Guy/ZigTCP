@@ -7,7 +7,7 @@ pub const Reader = struct {
     nextStart: usize = 0,
     socket: posix.socket_t,
 
-    fn readMessage(self: *Reader) ![]u8 {
+    pub fn readMessage(self: *Reader) ![]u8 {
         var buf = self.buf;
 
         while (true) {
@@ -27,13 +27,13 @@ pub const Reader = struct {
     fn checkBuffer(self: *Reader) !?[]u8 {
         const buf = self.buf;
         const pos = self.pos;
-        const start = self.start;
+        const start = self.nextStart;
 
         std.debug.assert(pos >= start);
         const unprocessed = buf[start..pos];
 
         if (unprocessed.len < 4) {
-            self.ensureSpace(4 - unprocessed.len) catch unreachable;
+            self.ensureBufferSpace(4 - unprocessed.len) catch unreachable;
             return null;
         }
 
@@ -41,17 +41,17 @@ pub const Reader = struct {
         const totalLength = messageLength + 4;
 
         if (unprocessed.len < totalLength) {
-            try ensureBufferSpace(totalLength);
+            try self.ensureBufferSpace(totalLength);
             return null;
         }
 
-        self.start += totalLength;
+        self.nextStart += totalLength;
         return unprocessed[4..totalLength];
     }
 
     fn ensureBufferSpace(self: *Reader, space: usize) error{BufferTooSmall}!void {
         const buf = self.buf;
-        const start = self.start;
+        const start = self.nextStart;
         const spare = buf.len - start;
 
         if (buf.len < space)
@@ -61,7 +61,7 @@ pub const Reader = struct {
 
         const unprocessed = buf[start..self.pos];
         std.mem.copyForwards(u8, buf[0..unprocessed.len], unprocessed);
-        self.start = 0;
+        self.nextStart = 0;
         self.pos = unprocessed.len;
     }
 };

@@ -2,13 +2,13 @@ const std = @import("std");
 const posix = std.posix;
 const net = std.net;
 
-const Reader = @import("Reader.zig");
+const Reader = @import("Reader.zig").Reader;
 
-const ClientHandler = struct {
+pub const ClientHandler = struct {
     socket: posix.socket_t,
     address: net.Address,
 
-    fn handleConnection(self: ClientHandler) void {
+    pub fn handleConnection(self: ClientHandler) void {
         self.handleConnectionInternal() catch |err| switch (err) {
             error.Closed => {},
             else => std.debug.print("[{any}] client handle error\n{}\n", .{ self.address, err }),
